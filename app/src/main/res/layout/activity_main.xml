@@ -1,0 +1,94 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <RadioGroup
+        android:id="@+id/modeGroup"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <RadioButton
+            android:id="@+id/modeWifi"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:checked="true"
+            android:text="Wi-Fi" />
+
+        <RadioButton
+            android:id="@+id/modeBle"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="BLE" />
+
+        <RadioButton
+            android:id="@+id/modeCell"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Cell" />
+    </RadioGroup>
+
+    <TextView
+        android:id="@+id/statusText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:textColor="#9CA3AF"
+        android:textSize="12sp"
+        android:text="—" />
+
+    <ua.sem.rfscout.PolarView
+        android:id="@+id/polarView"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1.2" />
+
+    <TextView
+        android:id="@+id/bearingText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textColor="#4ADE80"
+        android:textSize="16sp"
+        android:textStyle="bold"
+        android:text="Ціль не обрана" />
+
+    <ua.sem.rfscout.SpectrumView
+        android:id="@+id/spectrumView"
+        android:layout_width="match_parent"
+        android:layout_height="110dp" />
+
+    <ListView
+        android:id="@+id/targetList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:divider="#1F2937"
+        android:dividerHeight="1dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <Button
+            android:id="@+id/resetBtn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Скинути діаграму" />
+
+        <Button
+            android:id="@+id/scanBtn"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:text="Стоп" />
+    </LinearLayout>
+
+</LinearLayout>
