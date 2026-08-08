@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private val handler = Handler(Looper.getMainLooper())
     private var lastWifiScanRequest = 0L
+    private var lastListRefresh = 0L
     private var lastRssiSeen: Int? = null
 
     private val rot = FloatArray(9)
@@ -149,25 +150,34 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         wifi.stop()
         ble.stop()
         when (mode) {
-            Mode.WIFI -> wifi.start { updateTargets(it) }
+            Mode.WIFI -> wifi.start { targets = it }
             Mode.BLE -> {
-                val ok = ble.start { updateTargets(it) }
-                if (!ok) {
+                ble.clear()
+                if (!ble.start()) {
                     Toast.makeText(this, "Увімкни Bluetooth", Toast.LENGTH_SHORT).show()
                 }
             }
         }
+        lastListRefresh = 0L
     }
 
-    private fun updateTargets(fresh: List<Target>) {
+    private val rows = ArrayList<String>()
+    private var adapter: ArrayAdapter<String>? = null
+
+    private fun refreshList(fresh: List<Target>) {
         targets = fresh
-        val rows = fresh.map { t ->
+        rows.clear()
+        fresh.mapTo(rows) { t ->
             val ch = if (t.channel() > 0) " · CH${t.channel()}" else ""
             val f = if (t.freqMhz > 0) " · ${t.freqMhz} МГц" else ""
             "${t.label}\n${t.rssi} dBm · ${t.band()}$f$ch"
         }
-        val adapter = ArrayAdapter(this, android.R.layout.simple_list_item_activated_1, rows)
-        list.adapter = adapter
+        if (adapter == null) {
+            adapter = ArrayAdapter(this, android.R.layout.simple_list_item_activated_1, rows)
+            list.adapter = adapter
+        } else {
+            adapter?.notifyDataSetChanged()
+        }
         selectedId?.let { prev ->
             val idx = targets.indexOfFirst { it.id == prev }
             if (idx >= 0) list.setItemChecked(idx, true)
@@ -177,15 +187,24 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private val tick = object : Runnable {
         override fun run() {
             step()
-            handler.postDelayed(this, 350)
+            handler.postDelayed(this, 120)
         }
     }
 
     private fun step() {
         val now = System.currentTimeMillis()
-        if (mode == Mode.WIFI && now - lastWifiScanRequest > 30_000) {
+
+        // Скан просимо часто: якщо система тротлить, вона просто відмовить,
+        // зате на пристроях з вимкненим тротлінгом отримуємо максимум швидкості.
+        if (mode == Mode.WIFI && now - lastWifiScanRequest > 4_000) {
             lastWifiScanRequest = now
             wifi.requestScan()
+        }
+
+        // Список перебудовуємо раз на секунду, щоб не миготів.
+        if (now - lastListRefresh > 1_000) {
+            lastListRefresh = now
+            refreshList(if (mode == Mode.BLE) ble.snapshot() else wifi.snapshot())
         }
 
         val sel = selectedId
@@ -226,9 +245,19 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         coverageText.text = "обхід ${acc.coveragePercent()}%"
 
-        if (selectedId == null) {
+        val problem = if (mode == Mode.WIFI) wifi.problem() else
+            if (!ble.isReady()) "Увімкни Bluetooth" else null
+
+        if (problem != null && selectedId == null) {
+            hintText.text = problem
+            distText.text = if (mode == Mode.WIFI && wifi.throttled)
+                "Система тротлить скан. Developer options → Wi-Fi scan throttling → вимкнути"
+            else "Wi-Fi: ${wifi.bandsSupported()} · BLE 2.4 ГГц"
+        } else if (selectedId == null) {
             hintText.text = "Обери ціль зі списку"
-            distText.text = "Wi-Fi: ${wifi.bandsSupported()} · BLE 2.4 ГГц"
+            distText.text = if (mode == Mode.WIFI && wifi.throttled)
+                "Скан тротлиться. Developer options → Wi-Fi scan throttling → вимкнути"
+            else "Знайдено ${targets.size} · Wi-Fi ${wifi.bandsSupported()}"
         } else {
             hintText.text = acc.hint(azimuth)
             val conf = (acc.confidence() * 100).toInt()

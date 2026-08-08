@@ -47,7 +47,7 @@ class CompassView @JvmOverloads constructor(
     }
     private val arrow = Paint(Paint.ANTI_ALIAS_FLAG).apply { style = Paint.Style.FILL }
     private val bigText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
-        color = Color.WHITE; textSize = 74f; textAlign = Paint.Align.CENTER
+        color = Color.parseColor("#D6DCE4"); textSize = 74f; textAlign = Paint.Align.CENTER
         typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
     }
     private val smallText = Paint(Paint.ANTI_ALIAS_FLAG).apply {
@@ -151,9 +151,9 @@ class CompassView @JvmOverloads constructor(
         val perp = a + Math.PI / 2
 
         arrow.color = when {
-            confidence >= 0.55f -> Color.parseColor("#4ADE80")
-            confidence >= 0.30f -> Color.parseColor("#FACC15")
-            else -> Color.parseColor("#5A6675")
+            confidence >= 0.55f -> Color.parseColor("#3E9E63")
+            confidence >= 0.30f -> Color.parseColor("#9A8433")
+            else -> Color.parseColor("#3A434F")
         }
 
         arrowPath.reset()
@@ -172,10 +172,10 @@ class CompassView @JvmOverloads constructor(
     }
 
     private fun heatColor(n: Float): Int = when {
-        n > 0.80f -> Color.parseColor("#EF4444")
-        n > 0.60f -> Color.parseColor("#F97316")
-        n > 0.40f -> Color.parseColor("#FACC15")
-        n > 0.20f -> Color.parseColor("#65A30D")
-        else -> Color.parseColor("#1E3A2F")
+        n > 0.80f -> Color.parseColor("#B44A3A")
+        n > 0.60f -> Color.parseColor("#A56A2E")
+        n > 0.40f -> Color.parseColor("#8A7A2A")
+        n > 0.20f -> Color.parseColor("#4A6B3A")
+        else -> Color.parseColor("#16241C")
     }
 }
