@@ -25,7 +25,11 @@ class SignalTracker {
     var pathLossExp = 2.7
 
     fun setDefaultsFor(mode: Mode) {
-        rssiAt1m = if (mode == Mode.BLE) -59 else -40
+        rssiAt1m = if (mode == Mode.BLE || mode == Mode.BTC) -59 else -40
+    }
+
+    fun setDefaultsForKind(kind: Kind) {
+        rssiAt1m = if (kind == Kind.WIFI) -40 else -59
     }
 
     fun calibrateAt1m(rssi: Int) {

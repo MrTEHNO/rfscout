@@ -16,10 +16,12 @@ import android.widget.ListView
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import android.widget.ViewFlipper
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import ua.sem.rfscout.scanners.BleScanner
+import ua.sem.rfscout.scanners.BtClassicScanner
 import ua.sem.rfscout.scanners.WifiScanner
 import kotlin.math.atan2
 import kotlin.math.cos
@@ -28,6 +30,8 @@ import kotlin.math.sin
 class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var compass: CompassView
+    private lateinit var spectrum: SpectrumView
+    private lateinit var flipper: ViewFlipper
     private lateinit var hintText: TextView
     private lateinit var distText: TextView
     private lateinit var coverageText: TextView
@@ -38,10 +42,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
     private lateinit var wifi: WifiScanner
     private lateinit var ble: BleScanner
+    private lateinit var btc: BtClassicScanner
 
     private val acc = PolarAccumulator()
     private val tracker = SignalTracker()
-    private var mode = Mode.WIFI
+    private var mode = Mode.ALL
     private var targets: List<Target> = emptyList()
     private var selectedId: String? = null
 
@@ -52,7 +57,11 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private val handler = Handler(Looper.getMainLooper())
     private var lastWifiScanRequest = 0L
     private var lastListRefresh = 0L
+    private var lastSpectrumPush = 0L
     private var lastRssiSeen: Int? = null
+
+    private val rows = ArrayList<String>()
+    private var adapter: ArrayAdapter<String>? = null
 
     private val rot = FloatArray(9)
     private val remapped = FloatArray(9)
@@ -63,6 +72,8 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         setContentView(R.layout.activity_main)
 
         compass = findViewById(R.id.compass)
+        spectrum = findViewById(R.id.spectrum)
+        flipper = findViewById(R.id.flipper)
         hintText = findViewById(R.id.hintText)
         distText = findViewById(R.id.distText)
         coverageText = findViewById(R.id.coverageText)
@@ -75,7 +86,9 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
 
         wifi = WifiScanner(this)
         ble = BleScanner(this)
+        btc = BtClassicScanner(this)
         tracker.setDefaultsFor(mode)
+        spectrum.setBands(wifi.has5GHz(), wifi.has6GHz())
 
         list.choiceMode = ListView.CHOICE_MODE_SINGLE
         list.setOnItemClickListener { _, _, pos, _ ->
@@ -83,6 +96,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 selectedId = it.id
                 acc.reset()
                 tracker.reset()
+                tracker.setDefaultsForKind(it.kind)
                 lastRssiSeen = null
             }
         }
@@ -99,16 +113,21 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                 Toast.makeText(this, "Спершу обери ціль", Toast.LENGTH_SHORT).show()
             } else {
                 tracker.calibrateAt1m(r)
-                Toast.makeText(
-                    this,
-                    "Опорна точка: $r dBm на 1 м. Оцінка дистанції уточнена.",
-                    Toast.LENGTH_LONG
-                ).show()
+                Toast.makeText(this, "Опорна точка: $r dBm на 1 м", Toast.LENGTH_LONG).show()
             }
         }
 
+        findViewById<RadioGroup>(R.id.tabGroup).setOnCheckedChangeListener { _, id ->
+            flipper.displayedChild = if (id == R.id.tabSpectrum) 1 else 0
+        }
+
         findViewById<RadioGroup>(R.id.modeGroup).setOnCheckedChangeListener { _, id ->
-            mode = if (id == R.id.modeBle) Mode.BLE else Mode.WIFI
+            mode = when (id) {
+                R.id.modeWifi -> Mode.WIFI
+                R.id.modeBle -> Mode.BLE
+                R.id.modeBtc -> Mode.BTC
+                else -> Mode.ALL
+            }
             selectedId = null
             acc.reset()
             tracker.reset()
@@ -147,22 +166,36 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun restartScanners() {
-        wifi.stop()
-        ble.stop()
-        when (mode) {
-            Mode.WIFI -> wifi.start { targets = it }
-            Mode.BLE -> {
-                ble.clear()
-                if (!ble.start()) {
-                    Toast.makeText(this, "Увімкни Bluetooth", Toast.LENGTH_SHORT).show()
-                }
-            }
+        wifi.stop(); ble.stop(); btc.stop()
+
+        val wantWifi = mode == Mode.WIFI || mode == Mode.ALL
+        val wantBle = mode == Mode.BLE || mode == Mode.ALL
+        val wantBtc = mode == Mode.BTC || mode == Mode.ALL
+
+        if (wantWifi) wifi.start { }
+        if (wantBle) { ble.clear(); ble.start() }
+        if (wantBtc) { btc.clear(); btc.start() }
+
+        if ((wantBle || wantBtc) && !ble.isReady()) {
+            Toast.makeText(this, "Увімкни Bluetooth", Toast.LENGTH_SHORT).show()
         }
         lastListRefresh = 0L
     }
 
-    private val rows = ArrayList<String>()
-    private var adapter: ArrayAdapter<String>? = null
+    private fun collect(): List<Target> {
+        val out = ArrayList<Target>()
+        when (mode) {
+            Mode.WIFI -> out.addAll(wifi.snapshot())
+            Mode.BLE -> out.addAll(ble.snapshot())
+            Mode.BTC -> out.addAll(btc.snapshot())
+            Mode.ALL -> {
+                out.addAll(wifi.snapshot())
+                out.addAll(ble.snapshot())
+                out.addAll(btc.snapshot())
+            }
+        }
+        return out.sortedByDescending { it.rssi }
+    }
 
     private fun refreshList(fresh: List<Target>) {
         targets = fresh
@@ -170,7 +203,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         fresh.mapTo(rows) { t ->
             val ch = if (t.channel() > 0) " · CH${t.channel()}" else ""
             val f = if (t.freqMhz > 0) " · ${t.freqMhz} МГц" else ""
-            "${t.label}\n${t.rssi} dBm · ${t.band()}$f$ch"
+            "[${t.tag()}] ${t.label}\n${t.rssi} dBm · ${t.band()}$f$ch"
         }
         if (adapter == null) {
             adapter = ArrayAdapter(this, android.R.layout.simple_list_item_activated_1, rows)
@@ -187,24 +220,26 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
     private val tick = object : Runnable {
         override fun run() {
             step()
-            handler.postDelayed(this, 120)
+            handler.postDelayed(this, 100)
         }
     }
 
     private fun step() {
         val now = System.currentTimeMillis()
 
-        // Скан просимо часто: якщо система тротлить, вона просто відмовить,
-        // зате на пристроях з вимкненим тротлінгом отримуємо максимум швидкості.
-        if (mode == Mode.WIFI && now - lastWifiScanRequest > 4_000) {
+        if ((mode == Mode.WIFI || mode == Mode.ALL) && now - lastWifiScanRequest > 4_000) {
             lastWifiScanRequest = now
             wifi.requestScan()
         }
 
-        // Список перебудовуємо раз на секунду, щоб не миготів.
         if (now - lastListRefresh > 1_000) {
             lastListRefresh = now
-            refreshList(if (mode == Mode.BLE) ble.snapshot() else wifi.snapshot())
+            refreshList(collect())
+        }
+
+        if (now - lastSpectrumPush > 1_000) {
+            lastSpectrumPush = now
+            spectrum.push(targets)
         }
 
         val sel = selectedId
@@ -212,8 +247,14 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         var fresh = false
 
         if (sel != null) {
-            when (mode) {
-                Mode.WIFI -> {
+            val kind = targets.firstOrNull { it.id == sel }?.kind
+            when (kind) {
+                Kind.BLE -> { rssi = ble.rssiOf(sel); fresh = rssi != null }
+                Kind.BTC -> {
+                    rssi = btc.rssiOf(sel)
+                    fresh = rssi != null && rssi != lastRssiSeen
+                }
+                else -> {
                     val conn = wifi.connectedRssi()
                     if (conn != null && conn.first.equals(sel, true)) {
                         rssi = conn.second
@@ -222,10 +263,6 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
                         rssi = targets.firstOrNull { it.id == sel }?.rssi
                         fresh = rssi != null && rssi != lastRssiSeen
                     }
-                }
-                Mode.BLE -> {
-                    rssi = ble.rssiOf(sel)
-                    fresh = rssi != null
                 }
             }
         }
@@ -236,32 +273,31 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
             lastRssiSeen = rssi
         }
 
-        compass.heading = azimuth
-        compass.bearing = acc.bearing()
+        compass.setHeading(azimuth)
+        compass.setBearing(acc.bearing())
         compass.confidence = acc.confidence()
-        compass.centerValue = tracker.smoothedRssi()?.let { "$it" } ?: "—"
+        compass.centerValue = tracker.smoothedRssi()?.toString() ?: "—"
         compass.centerCaption = if (selectedId == null) "dBm" else "dBm · ${tracker.distanceBracket()}"
-        compass.invalidate()
 
         coverageText.text = "обхід ${acc.coveragePercent()}%"
 
-        val problem = if (mode == Mode.WIFI) wifi.problem() else
-            if (!ble.isReady()) "Увімкни Bluetooth" else null
+        val problem = when {
+            (mode == Mode.WIFI) -> wifi.problem()
+            (mode == Mode.BLE || mode == Mode.BTC) && !ble.isReady() -> "Увімкни Bluetooth"
+            else -> null
+        }
 
-        if (problem != null && selectedId == null) {
-            hintText.text = problem
-            distText.text = if (mode == Mode.WIFI && wifi.throttled)
-                "Система тротлить скан. Developer options → Wi-Fi scan throttling → вимкнути"
-            else "Wi-Fi: ${wifi.bandsSupported()} · BLE 2.4 ГГц"
-        } else if (selectedId == null) {
-            hintText.text = "Обери ціль зі списку"
-            distText.text = if (mode == Mode.WIFI && wifi.throttled)
-                "Скан тротлиться. Developer options → Wi-Fi scan throttling → вимкнути"
-            else "Знайдено ${targets.size} · Wi-Fi ${wifi.bandsSupported()}"
+        if (selectedId == null) {
+            hintText.text = problem ?: "Обери ціль зі списку"
+            distText.text = when {
+                (mode == Mode.WIFI || mode == Mode.ALL) && wifi.throttled ->
+                    "Тротлінг скану. Developer options → Wi-Fi scan throttling → вимкнути"
+                else -> "Знайдено ${targets.size} · Wi-Fi ${wifi.bandsSupported()} · BT 2.4 ГГц"
+            }
         } else {
             hintText.text = acc.hint(azimuth)
             val conf = (acc.confidence() * 100).toInt()
-            distText.text = "${tracker.trendText()} · дистанція ${tracker.distanceBracket()} · довіра $conf%"
+            distText.text = "${tracker.trendText()} · ${tracker.distanceBracket()} · довіра $conf%"
         }
     }
 
@@ -276,8 +312,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         super.onPause()
         sensors.unregisterListener(this)
         handler.removeCallbacks(tick)
-        wifi.stop()
-        ble.stop()
+        wifi.stop(); ble.stop(); btc.stop()
     }
 
     override fun onSensorChanged(event: SensorEvent?) {
@@ -293,7 +328,7 @@ class MainActivity : AppCompatActivity(), SensorEventListener {
         SensorManager.getOrientation(remapped, orient)
         val rad = orient[0].toDouble()
 
-        val a = 0.15
+        val a = 0.22
         sinAvg = sinAvg * (1 - a) + sin(rad) * a
         cosAvg = cosAvg * (1 - a) + cos(rad) * a
         var smooth = Math.toDegrees(atan2(sinAvg, cosAvg)).toFloat()

@@ -25,9 +25,58 @@ class CompassView @JvmOverloads constructor(
 ) : View(context, attrs, defStyle) {
 
     var acc: PolarAccumulator? = null
-    var heading = 0f
-    var bearing: Float? = null
     var confidence = 0f
+
+    // Ціль анімації та поточне згладжене значення: малюємо кадр за кадром,
+    // інакше стрілка смикається на кожен пакет.
+    private var headingTarget = 0f
+    private var bearingTarget: Float? = null
+    var heading = 0f
+        private set
+    private var bearingShown: Float? = null
+    private var settled = true
+
+    fun setHeading(v: Float) {
+        headingTarget = v
+        settled = false
+    }
+
+    fun setBearing(v: Float?) {
+        bearingTarget = v
+        if (v == null) bearingShown = null
+        settled = false
+    }
+
+    /** Крок згладжування по найкоротшій дузі, щоб не крутило через 359→0. */
+    private fun approach(cur: Float, target: Float, k: Float): Float {
+        var d = target - cur
+        while (d > 180f) d -= 360f
+        while (d < -180f) d += 360f
+        var v = cur + d * k
+        while (v < 0f) v += 360f
+        return v % 360f
+    }
+
+    private fun animateStep() {
+        val hNew = approach(heading, headingTarget, 0.22f)
+        var moved = Math.abs(hNew - heading) > 0.05f
+        heading = hNew
+
+        val bt = bearingTarget
+        if (bt != null) {
+            val cur = bearingShown
+            if (cur == null) {
+                bearingShown = bt
+                moved = true
+            } else {
+                val bNew = approach(cur, bt, 0.14f)
+                if (Math.abs(bNew - cur) > 0.05f) moved = true
+                bearingShown = bNew
+            }
+        }
+        settled = !moved
+        if (!settled) postInvalidateOnAnimation()
+    }
     var centerValue = "—"
     var centerCaption = ""
 
@@ -68,6 +117,7 @@ class CompassView @JvmOverloads constructor(
     }
 
     override fun onDraw(canvas: Canvas) {
+        animateStep()
         val cx = width / 2f
         val cy = height / 2f
         val r = min(cx, cy) - 16f
@@ -112,6 +162,7 @@ class CompassView @JvmOverloads constructor(
         }
 
         drawArrow(canvas, cx, cy, r)
+        drawSignature(canvas, cx, height.toFloat())
 
         canvas.drawText(centerValue, cx, cy + 6f, bigText)
         if (centerCaption.isNotEmpty()) {
@@ -140,7 +191,7 @@ class CompassView @JvmOverloads constructor(
     }
 
     private fun drawArrow(canvas: Canvas, cx: Float, cy: Float, r: Float) {
-        val b = bearing ?: return
+        val b = bearingShown ?: return
         val a = Math.toRadians(screen(b).toDouble() - 90.0)
         val len = r * 0.50f
         val tipX = cx + (cos(a) * len).toFloat()
@@ -169,6 +220,14 @@ class CompassView @JvmOverloads constructor(
         )
         arrowPath.close()
         canvas.drawPath(arrowPath, arrow)
+    }
+
+    private val signature = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        color = Color.parseColor("#3A434F"); textSize = 18f; textAlign = Paint.Align.CENTER
+    }
+
+    private fun drawSignature(canvas: Canvas, cx: Float, h: Float) {
+        canvas.drawText("Sem_TEHNO", cx, h - 6f, signature)
     }
 
     private fun heatColor(n: Float): Int = when {

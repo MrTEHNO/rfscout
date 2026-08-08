@@ -10,6 +10,7 @@ import android.location.LocationManager
 import android.net.wifi.WifiManager
 import android.os.Build
 import androidx.core.content.ContextCompat
+import ua.sem.rfscout.Kind
 import ua.sem.rfscout.Target
 
 /**
@@ -69,6 +70,12 @@ class WifiScanner(private val ctx: Context) {
         bssid to info.rssi
     }.getOrNull()
 
+    fun has5GHz(): Boolean = runCatching { wm.is5GHzBandSupported }.getOrDefault(false)
+
+    fun has6GHz(): Boolean =
+        if (Build.VERSION.SDK_INT >= 30) runCatching { wm.is6GHzBandSupported }.getOrDefault(false)
+        else false
+
     fun bandsSupported(): String {
         val sb = StringBuilder("2.4")
         runCatching { if (wm.is5GHzBandSupported) sb.append("/5") }
@@ -119,7 +126,8 @@ class WifiScanner(private val ctx: Context) {
                     id = r.BSSID ?: name,
                     label = name,
                     freqMhz = r.frequency,
-                    rssi = r.level
+                    rssi = r.level,
+                    kind = Kind.WIFI
                 )
             }.sortedByDescending { it.rssi }
         }.getOrDefault(emptyList())

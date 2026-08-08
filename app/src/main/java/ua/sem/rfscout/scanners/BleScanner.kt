@@ -6,6 +6,7 @@ import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.bluetooth.le.ScanSettings
 import android.content.Context
+import ua.sem.rfscout.Kind
 import ua.sem.rfscout.Target
 
 /**
@@ -32,7 +33,7 @@ class BleScanner(private val ctx: Context) {
                 ?: r.scanRecord?.deviceName
                 ?: "BLE ${addr.takeLast(5)}"
             synchronized(seen) {
-                seen[addr] = Target(id = addr, label = name, freqMhz = 2440, rssi = r.rssi)
+                seen[addr] = Target(id = addr, label = name, freqMhz = 2440, rssi = r.rssi, kind = Kind.BLE)
                 lastSeenAt[addr] = System.currentTimeMillis()
             }
         }

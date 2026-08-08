@@ -1,6 +1,8 @@
 package ua.sem.rfscout
 
-enum class Mode { WIFI, BLE }
+enum class Mode { WIFI, BLE, BTC, ALL }
+
+enum class Kind { WIFI, BLE, BTC }
 
 /**
  * Одне джерело радіосигналу, яке телефон реально бачить.
@@ -12,6 +14,7 @@ data class Target(
     val label: String,
     val freqMhz: Int,
     val rssi: Int,
+    val kind: Kind,
     val extra: String = ""
 ) {
     fun band(): String = when {
@@ -20,6 +23,12 @@ data class Target(
         freqMhz in 5150..5925 -> "5 ГГц"
         freqMhz in 5926..7125 -> "6 ГГц"
         else -> "$freqMhz МГц"
+    }
+
+    fun tag(): String = when (kind) {
+        Kind.WIFI -> "WIFI"
+        Kind.BLE -> "BLE"
+        Kind.BTC -> "BT"
     }
 
     fun channel(): Int = Rf.freqToChannel(freqMhz)
