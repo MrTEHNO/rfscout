@@ -2,73 +2,83 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="#000000"
     android:orientation="vertical"
-    android:padding="10dp">
+    android:padding="12dp">
 
-    <RadioGroup
-        android:id="@+id/modeGroup"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="horizontal">
 
-        <RadioButton
-            android:id="@+id/modeWifi"
+        <RadioGroup
+            android:id="@+id/modeGroup"
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:checked="true"
-            android:text="Wi-Fi" />
+            android:orientation="horizontal">
 
-        <RadioButton
-            android:id="@+id/modeBle"
-            android:layout_width="0dp"
-            android:layout_weight="1"
+            <RadioButton
+                android:id="@+id/modeWifi"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:checked="true"
+                android:textColor="#E5E7EB"
+                android:text="Wi-Fi" />
+
+            <RadioButton
+                android:id="@+id/modeBle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="16dp"
+                android:textColor="#E5E7EB"
+                android:text="Bluetooth" />
+        </RadioGroup>
+
+        <TextView
+            android:id="@+id/coverageText"
+            android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="BLE" />
+            android:gravity="end"
+            android:textColor="#6B7280"
+            android:textSize="13sp"
+            android:text="обхід 0%" />
+    </LinearLayout>
 
-        <RadioButton
-            android:id="@+id/modeCell"
-            android:layout_width="0dp"
-            android:layout_weight="1"
-            android:layout_height="wrap_content"
-            android:text="Cell" />
-    </RadioGroup>
-
-    <TextView
-        android:id="@+id/statusText"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:textColor="#9CA3AF"
-        android:textSize="12sp"
-        android:text="—" />
-
-    <ua.sem.rfscout.PolarView
-        android:id="@+id/polarView"
+    <ua.sem.rfscout.CompassView
+        android:id="@+id/compass"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1.2" />
+        android:layout_weight="1" />
 
     <TextView
-        android:id="@+id/bearingText"
+        android:id="@+id/hintText"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:gravity="center"
+        android:paddingTop="10dp"
         android:textColor="#4ADE80"
-        android:textSize="16sp"
+        android:textSize="19sp"
         android:textStyle="bold"
-        android:text="Ціль не обрана" />
+        android:text="Обери ціль зі списку" />
 
-    <ua.sem.rfscout.SpectrumView
-        android:id="@+id/spectrumView"
+    <TextView
+        android:id="@+id/distText"
         android:layout_width="match_parent"
-        android:layout_height="110dp" />
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:paddingTop="4dp"
+        android:paddingBottom="8dp"
+        android:textColor="#9CA3AF"
+        android:textSize="15sp"
+        android:text="—" />
 
     <ListView
         android:id="@+id/targetList"
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:divider="#1F2937"
+        android:layout_weight="0.85"
+        android:divider="#111827"
         android:dividerHeight="1dp" />
 
     <LinearLayout
@@ -81,14 +91,14 @@
             android:layout_width="0dp"
             android:layout_weight="1"
             android:layout_height="wrap_content"
-            android:text="Скинути діаграму" />
+            android:text="Скинути" />
 
         <Button
-            android:id="@+id/scanBtn"
+            android:id="@+id/calibBtn"
             android:layout_width="0dp"
-            android:layout_weight="1"
+            android:layout_weight="1.4"
             android:layout_height="wrap_content"
-            android:text="Стоп" />
+            android:text="Калібр. 1 м" />
     </LinearLayout>
 
 </LinearLayout>

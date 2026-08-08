@@ -75,6 +75,21 @@ class PolarAccumulator {
         return ((span / 20f).coerceAtMost(1f)) * cov
     }
 
+
+    /** Наскільки повернути оператора, щоб дивитись на джерело. Текстова підказка. */
+    fun hint(heading: Float): String {
+        val b = bearing() ?: return "Повертайся навколо себе на 360°"
+        var d = b - heading
+        while (d > 180) d -= 360
+        while (d < -180) d += 360
+        val a = Math.abs(d).toInt()
+        return when {
+            a <= 12 -> "Джерело прямо перед тобою"
+            d > 0 -> "Повертай праворуч на $a°"
+            else -> "Повертай ліворуч на $a°"
+        }
+    }
+
     companion object {
         const val EMPTY = -999
     }

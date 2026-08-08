@@ -1,10 +1,11 @@
 package ua.sem.rfscout
 
-enum class Mode { WIFI, BLE, CELL }
+enum class Mode { WIFI, BLE }
 
 /**
  * Одне джерело радіосигналу, яке телефон реально бачить.
- * freqMhz = 0, якщо частота невідома (BLE, частина стільникових).
+ * Ширші діапазони (3.3 ГГц, 5.8 аналог, sub-GHz) вбудованим залізом
+ * недосяжні — для них потрібен зовнішній SDR по OTG.
  */
 data class Target(
     val id: String,
@@ -15,11 +16,10 @@ data class Target(
 ) {
     fun band(): String = when {
         freqMhz == 0 -> "—"
-        freqMhz < 1000 -> "sub-GHz"
         freqMhz in 2400..2500 -> "2.4 ГГц"
         freqMhz in 5150..5925 -> "5 ГГц"
         freqMhz in 5926..7125 -> "6 ГГц"
-        else -> "${freqMhz} МГц"
+        else -> "$freqMhz МГц"
     }
 
     fun channel(): Int = Rf.freqToChannel(freqMhz)
@@ -35,18 +35,6 @@ object Rf {
         else -> 0
     }
 
-    /**
-     * Груба оцінка дистанції по log-distance path loss.
-     * Не метрологія: без калібрування txPower похибка легко 2-3x.
-     */
-    fun roughDistanceM(rssi: Int, freqMhz: Int, txPowerDbm: Int = 20): Double {
-        if (freqMhz <= 0) return -1.0
-        val fspl = txPowerDbm - rssi
-        val exp = (fspl - 20.0 * Math.log10(freqMhz.toDouble()) + 27.55) / 20.0
-        return Math.pow(10.0, exp)
-    }
-
-    /** Ширина сектора одного біна полярної діаграми, градусів. */
     const val BIN_DEG = 5
     const val BINS = 360 / BIN_DEG
 }
